@@ -21,6 +21,8 @@ Respond with ONLY valid JSON, no markdown code fences, no commentary, matching e
 {"considerations": [{"category": "string", "summary": "string"}, ...], "overallNote": "string"}`;
 
 exports.handler = async (event) => {
+  console.log("review-loi invoked. Method:", event.httpMethod, "Body length:", (event.body || "").length);
+
   const headers = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
@@ -33,10 +35,14 @@ exports.handler = async (event) => {
   }
 
   if (event.httpMethod !== "POST") {
+    console.error("Rejected: method not allowed:", event.httpMethod);
     return { statusCode: 405, headers, body: JSON.stringify({ error: "Method not allowed" }) };
   }
 
+  console.log("ANTHROPIC_API_KEY present?", Boolean(process.env.ANTHROPIC_API_KEY), "length:", (process.env.ANTHROPIC_API_KEY || "").length);
+
   if (!process.env.ANTHROPIC_API_KEY) {
+    console.error("Rejected: missing ANTHROPIC_API_KEY environment variable.");
     return {
       statusCode: 500,
       headers,
@@ -48,12 +54,15 @@ exports.handler = async (event) => {
   try {
     payload = JSON.parse(event.body || "{}");
   } catch (err) {
+    console.error("Rejected: could not parse request body as JSON:", event.body, err);
     return { statusCode: 400, headers, body: JSON.stringify({ error: "Invalid request body" }) };
   }
 
   const loiText = (payload.loiText || "").toString().trim();
+  console.log("Parsed loiText length:", loiText.length);
 
   if (!loiText) {
+    console.error("Rejected: loiText was empty after parsing payload:", JSON.stringify(payload).slice(0, 200));
     return { statusCode: 400, headers, body: JSON.stringify({ error: "Please paste your LOI text." }) };
   }
 
@@ -62,6 +71,7 @@ exports.handler = async (event) => {
   const trimmedLoi = loiText.length > MAX_CHARS ? loiText.slice(0, MAX_CHARS) : loiText;
 
   try {
+    console.log("Calling Anthropic API with model:", MODEL);
     const response = await fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
@@ -81,6 +91,8 @@ exports.handler = async (event) => {
         ]
       })
     });
+
+    console.log("Anthropic API responded with status:", response.status);
 
     if (!response.ok) {
       const errText = await response.text();

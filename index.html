@@ -198,6 +198,28 @@
   }
   .loi-card input::placeholder, .loi-card textarea::placeholder { color: #6b6d78; }
   .loi-card textarea { min-height: 240px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.85rem; resize: vertical; width: 100%; padding: 12px 14px; border-radius: 10px; }
+  .loi-mode-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .loi-mode-tab {
+    flex: 1;
+    background: var(--charcoal2);
+    border: 1px solid var(--grey-line);
+    color: #b8b9c2;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .loi-mode-tab.active { background: var(--pop); color: var(--black); border-color: transparent; }
+  .loi-card input[type="file"] {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--charcoal2);
+    border: 1px dashed var(--grey-line);
+    color: #d7d8e0;
+    font-size: 0.85rem;
+  }
   .loi-card input[type="text"], .loi-card input[type="email"] {
     width: 100%; padding: 12px 14px; border-radius: 10px; font-size: 0.92rem; font-family: inherit;
   }
@@ -230,31 +252,31 @@
   #form-message { text-align: center; font-size: 0.9rem; margin-top: 16px; display: none; }
 
   /* ---------- Why different ---------- */
-  .diff-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 22px;
+  .diff-list {
+    border-top: 1px solid var(--light-line);
   }
-  .diff-card {
-    border: 1px solid var(--light-line);
-    border-radius: 16px;
-    padding: 28px 24px;
-    background: var(--light-grey);
+  .diff-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 28px;
+    padding: 34px 0;
+    border-bottom: 1px solid var(--light-line);
   }
-  .diff-card .diff-num {
-    display: inline-flex;
+  .diff-item .diff-num {
+    display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px; height: 30px;
-    border-radius: 8px;
+    width: 40px; height: 40px;
+    border-radius: 10px;
     background: var(--pop);
     color: var(--black);
     font-weight: 800;
-    font-size: 0.9rem;
-    margin-bottom: 14px;
+    font-size: 1.05rem;
+    flex-shrink: 0;
   }
-  .diff-card h3 { font-size: 1.05rem; margin: 0 0 8px; font-weight: 700; }
-  .diff-card p { font-size: 0.9rem; color: var(--grey); margin: 0; }
+  .diff-item-content { flex: 1; }
+  .diff-item-content h3 { font-size: 1.12rem; margin: 0 0 8px; font-weight: 800; }
+  .diff-item-content p { font-size: 0.95rem; color: var(--grey); margin: 0; max-width: 700px; }
   .diff-compare {
     margin-top: 40px;
     border: 1px solid var(--light-line);
@@ -395,13 +417,28 @@
       <p class="loi-disclaimer">We'll use this to send your review and to follow up if you'd like to speak with our M&amp;A team. No spam.</p>
     </form>
 
-    <!-- Step 2: paste LOI (hidden until step 1 completes) -->
+    <!-- Step 2: upload or paste LOI (hidden until step 1 completes) -->
     <form id="loi-submission-form" name="loi-submission" method="POST" data-netlify="true" netlify-honeypot="bot-field" class="loi-card" style="display:none" onsubmit="handleLoiReviewSubmit(event)">
       <input type="hidden" name="form-name" value="loi-submission">
       <input type="hidden" name="name" id="loi-hidden-name">
       <input type="hidden" name="email" id="loi-hidden-email">
-      <label>Paste the text of your LOI</label>
-      <textarea name="loi_text" id="loi-text" placeholder="Paste the full text of your Letter of Intent here..." required></textarea>
+
+      <div class="loi-mode-tabs">
+        <button type="button" class="loi-mode-tab active" id="loi-tab-upload" onclick="switchLoiMode('upload')">Upload a file</button>
+        <button type="button" class="loi-mode-tab" id="loi-tab-paste" onclick="switchLoiMode('paste')">Paste text instead</button>
+      </div>
+
+      <div id="loi-upload-mode">
+        <label>Upload your LOI (PDF, Word .docx, or .txt)</label>
+        <input type="file" name="loi_file" id="loi-file" accept=".pdf,.docx,.txt">
+        <p class="loi-disclaimer" style="margin-top:8px;">Legacy .doc files aren't supported — please use .docx, .pdf, or .txt. Max file size 8MB.</p>
+      </div>
+
+      <div id="loi-paste-mode" style="display:none">
+        <label>Paste the text of your LOI</label>
+        <textarea name="loi_text" id="loi-text" placeholder="Paste the full text of your Letter of Intent here..."></textarea>
+      </div>
+
       <div class="submit-row">
         <button class="cta-btn" type="submit">Get My Free Review</button>
       </div>
@@ -411,7 +448,7 @@
     <!-- Loading state -->
     <div class="loi-loading" id="loi-loading">
       <div class="loi-spinner"></div>
-      Reviewing your LOI...
+      <span id="loi-loading-text">Reviewing your LOI...</span>
     </div>
 
     <!-- Error state -->
@@ -429,26 +466,34 @@
 <section id="why-different">
   <h2>Why not just paste it into a general AI chatbot?</h2>
   <p class="section-sub">You could. Here's why business owners use ours for LOI review instead.</p>
-  <div class="diff-grid">
-    <div class="diff-card">
+  <div class="diff-list">
+    <div class="diff-item">
       <div class="diff-num">1</div>
-      <h3>Trained on real M&amp;A deal patterns</h3>
-      <p>Our review is calibrated against the structures, terms, and red flags our lawyers have actually seen across hundreds of acquisitions — not generic internet text.</p>
+      <div class="diff-item-content">
+        <h3>Trained on real M&amp;A deal patterns</h3>
+        <p>Our review is calibrated against the structures, terms, and red flags our lawyers have actually seen across hundreds of acquisitions — not generic internet text.</p>
+      </div>
     </div>
-    <div class="diff-card">
+    <div class="diff-item">
       <div class="diff-num">2</div>
-      <h3>Purpose-built for one job</h3>
-      <p>A general AI assistant has to guess at what matters in your LOI. Ours is scoped narrowly to flag the specific business and deal-structure issues that come up in acquisitions.</p>
+      <div class="diff-item-content">
+        <h3>Purpose-built for one job</h3>
+        <p>A general AI assistant has to guess at what matters in your LOI. Ours is scoped narrowly to flag the specific business and deal-structure issues that come up in acquisitions.</p>
+      </div>
     </div>
-    <div class="diff-card">
+    <div class="diff-item">
       <div class="diff-num">3</div>
-      <h3>Reviewed and refined by M&amp;A lawyers</h3>
-      <p>The considerations this tool surfaces are shaped and continuously refined by our own M&amp;A practice — not a black box with no legal oversight.</p>
+      <div class="diff-item-content">
+        <h3>Reviewed and refined by M&amp;A lawyers</h3>
+        <p>The considerations this tool surfaces are shaped and continuously refined by our own M&amp;A practice — not a black box with no legal oversight.</p>
+      </div>
     </div>
-    <div class="diff-card">
+    <div class="diff-item">
       <div class="diff-num">4</div>
-      <h3>A direct line to real counsel</h3>
-      <p>Your free review connects you straight to lawyers who can take the deal further — a generic chatbot just leaves you with a wall of text and nowhere to go.</p>
+      <div class="diff-item-content">
+        <h3>A direct line to real counsel</h3>
+        <p>Your free review connects you straight to lawyers who can take the deal further — a generic chatbot just leaves you with a wall of text and nowhere to go.</p>
+      </div>
     </div>
   </div>
 
@@ -619,6 +664,13 @@
   </div>
 </footer>
 
+<!-- Client-side file parsing libraries: extract text from uploaded PDF/DOCX so it can be sent for AI review -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.11.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+</script>
+
 <script>
 function handleSubmit(e) {
   e.preventDefault();
@@ -670,36 +722,125 @@ function handleLoiLeadSubmit(e) {
   });
 }
 
-// Step 2: save the full record (email + LOI text) to Netlify Forms, and separately call the AI function for instant feedback
+// Toggle between "upload a file" and "paste text" modes in Step 2
+function switchLoiMode(mode) {
+  const uploadTab = document.getElementById('loi-tab-upload');
+  const pasteTab = document.getElementById('loi-tab-paste');
+  const uploadMode = document.getElementById('loi-upload-mode');
+  const pasteMode = document.getElementById('loi-paste-mode');
+
+  if (mode === 'upload') {
+    uploadTab.classList.add('active');
+    pasteTab.classList.remove('active');
+    uploadMode.style.display = 'block';
+    pasteMode.style.display = 'none';
+  } else {
+    pasteTab.classList.add('active');
+    uploadTab.classList.remove('active');
+    pasteMode.style.display = 'block';
+    uploadMode.style.display = 'none';
+  }
+}
+
+// Extract plain text from an uploaded PDF, DOCX, or TXT file, client-side
+function extractTextFromFile(file) {
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith('.txt')) {
+    return file.text();
+  }
+
+  if (name.endsWith('.docx')) {
+    return file.arrayBuffer().then(function (buf) {
+      return mammoth.extractRawText({ arrayBuffer: buf }).then(function (result) {
+        return result.value;
+      });
+    });
+  }
+
+  if (name.endsWith('.pdf')) {
+    return file.arrayBuffer().then(function (buf) {
+      return pdfjsLib.getDocument({ data: buf }).promise.then(function (pdf) {
+        const pageTextPromises = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+          pageTextPromises.push(
+            pdf.getPage(i).then(function (page) {
+              return page.getTextContent().then(function (content) {
+                return content.items.map(function (item) { return item.str; }).join(' ');
+              });
+            })
+          );
+        }
+        return Promise.all(pageTextPromises).then(function (pages) { return pages.join('\n\n'); });
+      });
+    });
+  }
+
+  return Promise.reject(new Error('Unsupported file type. Please upload a .pdf, .docx, or .txt file.'));
+}
+
+// Step 2: save the full record (email + original file or text) to Netlify Forms, and separately call the AI function for instant feedback
 function handleLoiReviewSubmit(e) {
   e.preventDefault();
   const form = e.target;
   const name = document.getElementById('loi-hidden-name').value;
   const email = document.getElementById('loi-hidden-email').value;
-  const loiText = document.getElementById('loi-text').value;
+
+  const isUploadMode = document.getElementById('loi-tab-upload').classList.contains('active');
+  const fileInput = document.getElementById('loi-file');
+  const file = isUploadMode && fileInput.files.length ? fileInput.files[0] : null;
+  const pastedText = document.getElementById('loi-text').value;
 
   const loading = document.getElementById('loi-loading');
   const errorBox = document.getElementById('loi-error');
   const results = document.getElementById('loi-results');
   const resultsList = document.getElementById('loi-results-list');
 
+  if (isUploadMode && !file) {
+    alert('Please choose a file to upload, or switch to "Paste text instead".');
+    return;
+  }
+  if (!isUploadMode && !pastedText.trim()) {
+    alert('Please paste your LOI text.');
+    return;
+  }
+
   form.style.display = 'none';
   errorBox.style.display = 'none';
   results.style.display = 'none';
   loading.style.display = 'block';
+  document.getElementById('loi-loading-text').textContent = file ? 'Reading your file...' : 'Reviewing your LOI...';
   document.getElementById('loi-pill-2').classList.remove('active');
   document.getElementById('loi-pill-3').classList.add('active');
 
-  fetch("/", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: netlifyEncode({ "form-name": "loi-submission", name: name, email: email, loi_text: loiText })
-  }).catch(() => { /* non-blocking — still show the AI review even if this fails */ });
+  // Save a copy of the submission to Netlify Forms — the original file if uploaded, otherwise the pasted text
+  if (file) {
+    const fileData = new FormData();
+    fileData.append('form-name', 'loi-submission');
+    fileData.append('name', name);
+    fileData.append('email', email);
+    fileData.append('loi_file', file);
+    fetch("/", { method: "POST", body: fileData }).catch(() => { /* non-blocking */ });
+  } else {
+    fetch("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: netlifyEncode({ "form-name": "loi-submission", name: name, email: email, loi_text: pastedText })
+    }).catch(() => { /* non-blocking */ });
+  }
 
-  fetch("/.netlify/functions/review-loi", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: name, email: email, loiText: loiText })
+  // Get the plain text to send for AI review — extracted from the file, or the pasted text directly
+  const textPromise = file ? extractTextFromFile(file) : Promise.resolve(pastedText);
+
+  textPromise
+  .then(function (loiText) {
+    document.getElementById('loi-loading-text').textContent = 'Reviewing your LOI...';
+
+    return fetch("/.netlify/functions/review-loi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name, email: email, loiText: loiText })
+    });
   })
   .then(res => {
     if (!res.ok) throw new Error("Request failed");

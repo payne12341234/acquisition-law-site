@@ -96,7 +96,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 2000,
+        max_tokens: 3500,
         system: buildSystemPrompt(perspective),
         messages: [
           {
@@ -150,11 +150,17 @@ exports.handler = async (event) => {
         }
       }
     } catch (parseErr) {
-      console.error("Failed to parse model output as JSON. Raw text was:", rawText);
+      console.error("Failed to parse model output as JSON. Stop reason:", data.stop_reason, "Parse error:", parseErr.message, "Raw text was:", rawText);
       return {
         statusCode: 502,
         headers,
-        body: JSON.stringify({ error: "Could not generate a structured review. Please try again.", debugRaw: rawText.slice(0, 500) })
+        body: JSON.stringify({
+          error: "Could not generate a structured review. Please try again.",
+          debugStopReason: data.stop_reason,
+          debugParseError: parseErr.message,
+          debugRaw: rawText.slice(0, 4000),
+          debugRawLength: rawText.length
+        })
       };
     }
 

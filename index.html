@@ -856,10 +856,11 @@ function handleLoiReviewSubmit(e) {
   .then(res => {
     console.log("review-loi function response status:", res.status);
     if (!res.ok) {
-      return res.json().then(function (errData) {
+      // Try to parse a JSON error body; if that fails, fall back to null rather than
+      // throwing here (throwing here would get caught by our own .catch below and
+      // mask whatever the real error message was).
+      return res.json().catch(function () { return null; }).then(function (errData) {
         throw new Error(errData && errData.error ? errData.error : ("Request failed (status " + res.status + ")"));
-      }).catch(function () {
-        throw new Error("Request failed (status " + res.status + ")");
       });
     }
     return res.json();

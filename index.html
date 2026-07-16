@@ -28,7 +28,7 @@
   a { color: inherit; }
 
   /* ---------- Logo ---------- */
-  .logo-wrap { display: flex; align-items: center; gap: 12px; }
+  .logo-wrap { display: flex; align-items: center; gap: 12px; text-decoration: none; cursor: pointer; }
   .logo-mark {
     display: block;
     flex-shrink: 0;
@@ -61,6 +61,49 @@
     transition: color 0.15s;
   }
   nav a:hover { color: var(--pop); }
+  .nav-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: 1px solid var(--grey-line);
+    border-radius: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .nav-toggle span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: var(--white);
+    border-radius: 2px;
+  }
+  @media (max-width: 860px) {
+    .nav-toggle { display: flex; }
+    nav#main-nav {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--black);
+      flex-direction: column;
+      padding: 10px 6% 22px;
+      border-top: 1px solid var(--grey-line);
+    }
+    nav#main-nav.open { display: flex; }
+    nav#main-nav a {
+      margin-left: 0;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--grey-line);
+      font-size: 1rem;
+    }
+    header { flex-wrap: wrap; position: relative; }
+  }
 
   /* ---------- Hero ---------- */
   .hero {
@@ -353,34 +396,32 @@
 <body>
 
 <header>
-  <div class="logo-wrap">
+  <a href="#" class="logo-wrap" onclick="window.scrollTo({top:0,behavior:'smooth'}); return false;">
     <svg class="logo-mark" viewBox="0 0 38 38" xmlns="http://www.w3.org/2000/svg">
       <rect width="38" height="38" rx="10" fill="#D7FF3E"/>
       <circle cx="14.5" cy="19" r="7.5" fill="#0a0a0b"/>
       <circle cx="23.5" cy="19" r="7.5" fill="#0a0a0b" opacity="0.55"/>
     </svg>
     <div class="logo-text">acquisition<span class="dotlaw">.law</span></div>
-  </div>
-  <nav>
+  </a>
+  <nav id="main-nav">
     <a href="#loi-review">Free LOI Review</a>
     <a href="#why-different">Why It's Different</a>
     <a href="#process">The M&A Process</a>
-    <a href="#contact">Contact</a>
+    <a href="#contact">Request Consultation</a>
   </nav>
+  <button class="nav-toggle" id="nav-toggle" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </header>
 
 <div class="hero">
   <span class="eyebrow">Free Instant Tool</span>
-  <h1>Get an <span class="highlight">instant AI review</span> of your Letter of Intent — built for M&amp;A, not guesswork.</h1>
+  <h1>Get an <span class="highlight">instant review</span> of your Letter of Intent — built for M&amp;A, not guesswork.</h1>
   <p>Paste your LOI and get high-level, lawyer-informed things to consider in seconds. Free, no obligation.</p>
   <div class="hero-actions">
     <button class="cta-btn" onclick="document.getElementById('loi-review').scrollIntoView({behavior:'smooth'})">Try It Free →</button>
     <a class="cta-secondary" href="#contact">Talk to Our M&amp;A Team</a>
-  </div>
-  <div class="stats">
-    <div class="stat"><div class="num">150+</div><div class="label">Deals Guided</div></div>
-    <div class="stat"><div class="num">$2B+</div><div class="label">Transaction Value</div></div>
-    <div class="stat"><div class="num">20+</div><div class="label">Years Combined Experience</div></div>
   </div>
 </div>
 
@@ -672,6 +713,18 @@
 </script>
 
 <script>
+function toggleMobileNav() {
+  document.getElementById('main-nav').classList.toggle('open');
+}
+// Close the mobile menu automatically after tapping a nav link
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('#main-nav a').forEach(function (link) {
+    link.addEventListener('click', function () {
+      document.getElementById('main-nav').classList.remove('open');
+    });
+  });
+});
+
 function handleSubmit(e) {
   e.preventDefault();
   const form = e.target;
@@ -685,7 +738,8 @@ function handleSubmit(e) {
   })
   .then(() => {
     msg.style.display = 'block';
-    msg.style.color = '#D7FF3E';
+    msg.style.color = '#12131a';
+    msg.style.fontWeight = '700';
     msg.textContent = "Thanks — your request has been sent. We'll follow up shortly.";
     form.reset();
   })

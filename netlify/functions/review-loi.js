@@ -27,7 +27,7 @@ Rules:
 - Focus on general, educational, non-legal business considerations relevant to the stated perspective above: things like whether provisions appear binding vs non-binding, exclusivity/no-shop periods, purchase price mechanics, financing contingencies, due diligence timelines, confidentiality, termination and break-up fee provisions, and other terms worth discussing with a lawyer.
 - If the pasted text does not look like an LOI at all, say so briefly and still offer general educational notes on what a real LOI review would typically cover.
 - Keep each item's summary to 1-3 sentences, plain English, no legal jargon.
-- Produce 4 to 7 items.
+- Produce 7 to 10 items, covering as many distinct, genuinely relevant considerations as the document supports. Do not pad with filler — every item should be a real, separate point worth raising.
 
 Respond with ONLY valid JSON, no markdown code fences, no commentary, matching exactly this shape:
 {"considerations": [{"category": "string", "summary": "string"}, ...], "overallNote": "string"}`;
@@ -72,18 +72,36 @@ exports.handler = async (event) => {
   }
 
   const loiText = (payload.loiText || "").toString().trim();
+  const pdfBase64 = (payload.pdfBase64 || "").toString().trim();
   const perspectiveRaw = (payload.perspective || "").toString().toLowerCase().trim();
   const perspective = (perspectiveRaw === "buyer" || perspectiveRaw === "seller") ? perspectiveRaw : "";
-  console.log("Parsed loiText length:", loiText.length, "Perspective:", perspective || "(not specified)");
+  console.log("Parsed loiText length:", loiText.length, "pdfBase64 length:", pdfBase64.length, "Perspective:", perspective || "(not specified)");
 
-  if (!loiText) {
-    console.error("Rejected: loiText was empty after parsing payload:", JSON.stringify(payload).slice(0, 200));
-    return { statusCode: 400, headers, body: JSON.stringify({ error: "Please paste your LOI text." }) };
+  if (!loiText && !pdfBase64) {
+    console.error("Rejected: no loiText or pdfBase64 in payload:", JSON.stringify(payload).slice(0, 200));
+    return { statusCode: 400, headers, body: JSON.stringify({ error: "Please paste your LOI text or upload a file." }) };
+  }
+
+  // Defense in depth: reject an oversized base64 PDF even if the client-side size check was bypassed.
+  const MAX_BASE64_CHARS = 6 * 1024 * 1024;
+  if (pdfBase64 && pdfBase64.length > MAX_BASE64_CHARS) {
+    console.error("Rejected: pdfBase64 too large:", pdfBase64.length);
+    return { statusCode: 400, headers, body: JSON.stringify({ error: "That PDF is too large to process this way. Please try a smaller file or paste the text instead." }) };
   }
 
   // Cap input length to keep costs predictable and avoid abuse.
   const MAX_CHARS = 15000;
   const trimmedLoi = loiText.length > MAX_CHARS ? loiText.slice(0, MAX_CHARS) : loiText;
+
+  // Build the message content: either a plain-text LOI, or — for scanned/image-only PDFs where
+  // client-side text extraction came back empty — the PDF itself as a document Claude can read
+  // directly with its vision capability (this works on scanned pages, unlike plain text extraction).
+  const userContent = pdfBase64
+    ? [
+        { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } },
+        { type: "text", text: "The attached PDF is a Letter of Intent (LOI) for a business acquisition — it may be a scanned document. Please review it according to your instructions." }
+      ]
+    : `Here is the pasted LOI text:\n\n"""\n${trimmedLoi}\n"""`;
 
   try {
     console.log("Calling Anthropic API with model:", MODEL);
@@ -96,12 +114,12 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 3500,
+        max_tokens: 4500,
         system: buildSystemPrompt(perspective),
         messages: [
           {
             role: "user",
-            content: `Here is the pasted LOI text:\n\n"""\n${trimmedLoi}\n"""`
+            content: userContent
           }
         ]
       })

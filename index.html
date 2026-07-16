@@ -466,11 +466,11 @@
 
       <div class="full-row">
         <label>Are you the buyer or the seller in this deal?</label>
-        <select name="perspective" id="loi-perspective" required>
-          <option value="">Select one...</option>
-          <option value="buyer">I'm the buyer</option>
-          <option value="seller">I'm the seller</option>
-        </select>
+        <input type="hidden" name="perspective" id="loi-perspective" value="">
+        <div class="loi-mode-tabs">
+          <button type="button" class="loi-mode-tab" id="loi-tab-buyer" onclick="selectPerspective('buyer')">I'm the Buyer</button>
+          <button type="button" class="loi-mode-tab" id="loi-tab-seller" onclick="selectPerspective('seller')">I'm the Seller</button>
+        </div>
       </div>
 
       <div class="loi-mode-tabs">
@@ -788,6 +788,13 @@ function handleLoiLeadSubmit(e) {
     document.getElementById('loi-pill-1').classList.remove('active');
     document.getElementById('loi-pill-2').classList.add('active');
   });
+}
+
+// Toggle between "buyer" and "seller" for the perspective question
+function selectPerspective(role) {
+  document.getElementById('loi-perspective').value = role;
+  document.getElementById('loi-tab-buyer').classList.toggle('active', role === 'buyer');
+  document.getElementById('loi-tab-seller').classList.toggle('active', role === 'seller');
 }
 
 // Toggle between "upload a file" and "paste text" modes in Step 2

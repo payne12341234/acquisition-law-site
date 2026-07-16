@@ -854,6 +854,20 @@ function extractTextFromFile(file) {
   return Promise.reject(new Error('Unsupported file type. Please upload a .pdf, .docx, or .txt file.'));
 }
 
+// Convert a file to a base64 string (used to send scanned/image-only PDFs directly to Claude,
+// which can read them with its vision capability when plain text extraction comes back empty).
+function fileToBase64(file) {
+  return file.arrayBuffer().then(function (buf) {
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+  });
+}
+
 // Step 2: save the full record (email + original file or text) to Netlify Forms, and separately call the AI function for instant feedback
 function handleLoiReviewSubmit(e) {
   e.preventDefault();
@@ -921,9 +935,24 @@ function handleLoiReviewSubmit(e) {
   textPromise
   .then(function (loiText) {
     // Some PDFs (scanned documents, "printed to PDF" images) have no selectable text layer at all —
-    // pdf.js can only pull embedded text, not read text out of an image. Catch that case clearly.
-    if (file && file.name.toLowerCase().endsWith('.pdf') && loiText.trim().length < 20) {
-      throw new Error('SCANNED_PDF');
+    // pdf.js can only pull embedded text, not read text out of an image. In that case, fall back to
+    // sending the PDF itself to Claude, which can read scanned pages directly using its vision capability.
+    const isEmptyPdfText = file && file.name.toLowerCase().endsWith('.pdf') && loiText.trim().length < 20;
+
+    if (isEmptyPdfText) {
+      const MAX_SCAN_BYTES = 4 * 1024 * 1024; // keep the request comfortably under the function's payload limit
+      if (file.size > MAX_SCAN_BYTES) {
+        throw new Error('SCANNED_PDF_TOO_LARGE');
+      }
+      document.getElementById('loi-loading-text').textContent = "This looks like a scanned document — reading the pages directly...";
+      return fileToBase64(file).then(function (base64) {
+        console.log("Sending scanned PDF as base64 document. Length:", base64.length);
+        return fetch("/.netlify/functions/review-loi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name, email: email, perspective: perspective, pdfBase64: base64 })
+        });
+      });
     }
 
     document.getElementById('loi-loading-text').textContent = 'Reviewing your LOI...';
@@ -978,8 +1007,8 @@ function handleLoiReviewSubmit(e) {
   .catch((err) => {
     loading.style.display = 'none';
     errorBox.style.display = 'block';
-    if (err && err.message === 'SCANNED_PDF') {
-      errorBox.textContent = "We couldn't find any readable text in this PDF — it looks like a scanned image rather than a text-based document. Please try \"Paste text instead,\" or upload a text-based Word (.docx) or .txt file.";
+    if (err && err.message === 'SCANNED_PDF_TOO_LARGE') {
+      errorBox.textContent = "This looks like a scanned PDF, and it's too large for us to read the pages directly (over 4MB). Please try a smaller file, or use \"Paste text instead.\"";
     } else {
       console.error("LOI review error:", err);
       errorBox.textContent = "Something went wrong generating your review (detail: " + (err && err.message ? err.message : String(err)) + "). Your LOI has been saved and our team will follow up directly.";

@@ -875,7 +875,8 @@ function handleLoiReviewSubmit(e) {
     if (err && err.message === 'SCANNED_PDF') {
       errorBox.textContent = "We couldn't find any readable text in this PDF — it looks like a scanned image rather than a text-based document. Please try \"Paste text instead,\" or upload a text-based Word (.docx) or .txt file.";
     } else {
-      errorBox.textContent = "Something went wrong generating your review. Your LOI has been saved and our team will follow up directly.";
+      console.error("LOI review error:", err);
+      errorBox.textContent = "Something went wrong generating your review (detail: " + (err && err.message ? err.message : String(err)) + "). Your LOI has been saved and our team will follow up directly.";
     }
   });
 }

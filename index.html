@@ -860,7 +860,11 @@ function handleLoiReviewSubmit(e) {
       // throwing here (throwing here would get caught by our own .catch below and
       // mask whatever the real error message was).
       return res.json().catch(function () { return null; }).then(function (errData) {
-        throw new Error(errData && errData.error ? errData.error : ("Request failed (status " + res.status + ")"));
+        var msg = errData && errData.error ? errData.error : ("Request failed (status " + res.status + ")");
+        if (errData && errData.debugRaw) {
+          msg += " | Raw AI output: " + errData.debugRaw;
+        }
+        throw new Error(msg);
       });
     }
     return res.json();

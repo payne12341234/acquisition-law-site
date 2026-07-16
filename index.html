@@ -464,6 +464,15 @@
       <input type="hidden" name="name" id="loi-hidden-name">
       <input type="hidden" name="email" id="loi-hidden-email">
 
+      <div class="full-row">
+        <label>Are you the buyer or the seller in this deal?</label>
+        <select name="perspective" id="loi-perspective" required>
+          <option value="">Select one...</option>
+          <option value="buyer">I'm the buyer</option>
+          <option value="seller">I'm the seller</option>
+        </select>
+      </div>
+
       <div class="loi-mode-tabs">
         <button type="button" class="loi-mode-tab active" id="loi-tab-upload" onclick="switchLoiMode('upload')">Upload a file</button>
         <button type="button" class="loi-mode-tab" id="loi-tab-paste" onclick="switchLoiMode('paste')">Paste text instead</button>
@@ -478,6 +487,11 @@
       <div id="loi-paste-mode" style="display:none">
         <label>Paste the text of your LOI</label>
         <textarea name="loi_text" id="loi-text" placeholder="Paste the full text of your Letter of Intent here..."></textarea>
+      </div>
+
+      <div class="full-row" style="display:flex; align-items:flex-start; gap:10px; margin-top:20px;">
+        <input type="checkbox" name="privacy_consent" id="loi-consent" required style="width:auto; margin-top:3px;">
+        <label for="loi-consent" style="font-weight:400; font-size:0.83rem; color:#b8b9c2;">I agree to the <a href="privacy-policy.html" target="_blank" style="color:var(--pop);">Privacy Policy</a>, including the use of de-identified information from my submission to improve this tool.</label>
       </div>
 
       <div class="submit-row">
@@ -701,7 +715,7 @@
     Lawyer Advertising. Prior results do not guarantee a similar outcome. This website provides general information and does not constitute legal advice. Contacting us through this form does not create a lawyer-client relationship.
   </div>
   <div class="bottom">
-    &copy; 2026 acquisition.law
+    &copy; 2026 acquisition.law &nbsp;|&nbsp; <a href="privacy-policy.html" style="color:#8b8c96; text-decoration:underline;">Privacy Policy</a>
   </div>
 </footer>
 
@@ -844,12 +858,22 @@ function handleLoiReviewSubmit(e) {
   const fileInput = document.getElementById('loi-file');
   const file = isUploadMode && fileInput.files.length ? fileInput.files[0] : null;
   const pastedText = document.getElementById('loi-text').value;
+  const perspective = document.getElementById('loi-perspective').value;
+  const consentChecked = document.getElementById('loi-consent').checked;
 
   const loading = document.getElementById('loi-loading');
   const errorBox = document.getElementById('loi-error');
   const results = document.getElementById('loi-results');
   const resultsList = document.getElementById('loi-results-list');
 
+  if (!perspective) {
+    alert('Please select whether you are the buyer or the seller.');
+    return;
+  }
+  if (!consentChecked) {
+    alert('Please confirm you agree to the Privacy Policy before submitting.');
+    return;
+  }
   if (isUploadMode && !file) {
     alert('Please choose a file to upload, or switch to "Paste text instead".');
     return;
@@ -873,13 +897,14 @@ function handleLoiReviewSubmit(e) {
     fileData.append('form-name', 'loi-submission');
     fileData.append('name', name);
     fileData.append('email', email);
+    fileData.append('perspective', perspective);
     fileData.append('loi_file', file);
     fetch("/", { method: "POST", body: fileData }).catch(() => { /* non-blocking */ });
   } else {
     fetch("/", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: netlifyEncode({ "form-name": "loi-submission", name: name, email: email, loi_text: pastedText })
+      body: netlifyEncode({ "form-name": "loi-submission", name: name, email: email, perspective: perspective, loi_text: pastedText })
     }).catch(() => { /* non-blocking */ });
   }
 
@@ -904,7 +929,7 @@ function handleLoiReviewSubmit(e) {
     return fetch("/.netlify/functions/review-loi", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name, email: email, loiText: sendText })
+      body: JSON.stringify({ name: name, email: email, perspective: perspective, loiText: sendText })
     });
   })
   .then(res => {

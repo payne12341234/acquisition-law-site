@@ -105,7 +105,17 @@ exports.handler = async (event) => {
     }
 
     const data = await response.json();
-    const rawText = (data.content && data.content[0] && data.content[0].text) || "";
+    console.log("Response stop_reason:", data.stop_reason, "Content block types:", Array.isArray(data.content) ? data.content.map(function (b) { return b && b.type; }) : typeof data.content);
+
+    // Pull text out of every "text" content block rather than assuming content[0] is the text
+    // (the response can include other block types, e.g. thinking blocks, before the text block).
+    let rawText = "";
+    if (Array.isArray(data.content)) {
+      rawText = data.content
+        .filter(function (block) { return block && block.type === "text" && typeof block.text === "string"; })
+        .map(function (block) { return block.text; })
+        .join("\n");
+    }
 
     let parsed;
     try {

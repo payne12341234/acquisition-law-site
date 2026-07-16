@@ -5,20 +5,33 @@
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-5"; // swap to "claude-haiku-4-5-20251001" for a cheaper/faster option
 
-const SYSTEM_PROMPT = `You are a general business-education assistant embedded in a law firm's marketing website (acquisition.law, run by Founders LLP, a Canadian M&A law firm).
+function buildSystemPrompt(perspective) {
+  const isSeller = perspective === "seller";
+  const isBuyer = perspective === "buyer";
+
+  const perspectiveParagraph = isSeller
+    ? `The person pasting this LOI is the SELLER in this transaction. Frame every consideration from the seller's point of view: things like whether the exclusivity/no-shop period is too long or too broad, whether purchase price mechanics (earnouts, holdbacks, adjustments) shift risk onto the seller, whether reps/warranties or indemnification terms expose the seller to outsized liability, deal-certainty and financing-contingency risk (i.e. is the buyer actually likely to close), and confidentiality of the seller's business information during diligence.`
+    : isBuyer
+    ? `The person pasting this LOI is the BUYER in this transaction. Frame every consideration from the buyer's point of view: things like whether the exclusivity period gives enough time to complete diligence, financing contingencies and deal-certainty protections for the buyer, purchase price adjustment mechanics, the scope of diligence access being granted, and conditions that need to be satisfied before the buyer is obligated to close.`
+    : `The submitter did not specify whether they are the buyer or the seller — provide balanced, general considerations relevant to either side, and note where a term would matter differently depending on which side of the deal the reader is on.`;
+
+  return `You are a general business-education assistant embedded in a law firm's marketing website (acquisition.law, run by Founders LLP, a Canadian M&A law firm).
 A prospective client has pasted the text of a Letter of Intent (LOI) for a business acquisition. Your job is to produce a short, plain-English list of high-level things a business owner should think about or ask a lawyer about — NOT legal advice, NOT a legal opinion, and NOT a substitute for review by a licensed lawyer.
+
+${perspectiveParagraph}
 
 Rules:
 - Do not state conclusions about enforceability, validity, or legality of any clause.
 - Do not draft or suggest specific legal language.
 - Do not give jurisdiction-specific legal advice.
-- Focus on general, educational, non-legal business considerations: things like whether provisions appear binding vs non-binding, exclusivity/no-shop periods, purchase price mechanics, financing contingencies, due diligence timelines, confidentiality, termination and break-up fee provisions, and other terms worth discussing with a lawyer.
+- Focus on general, educational, non-legal business considerations relevant to the stated perspective above: things like whether provisions appear binding vs non-binding, exclusivity/no-shop periods, purchase price mechanics, financing contingencies, due diligence timelines, confidentiality, termination and break-up fee provisions, and other terms worth discussing with a lawyer.
 - If the pasted text does not look like an LOI at all, say so briefly and still offer general educational notes on what a real LOI review would typically cover.
 - Keep each item's summary to 1-3 sentences, plain English, no legal jargon.
 - Produce 4 to 7 items.
 
 Respond with ONLY valid JSON, no markdown code fences, no commentary, matching exactly this shape:
 {"considerations": [{"category": "string", "summary": "string"}, ...], "overallNote": "string"}`;
+}
 
 exports.handler = async (event) => {
   console.log("review-loi invoked. Method:", event.httpMethod, "Body length:", (event.body || "").length);
@@ -59,7 +72,9 @@ exports.handler = async (event) => {
   }
 
   const loiText = (payload.loiText || "").toString().trim();
-  console.log("Parsed loiText length:", loiText.length);
+  const perspectiveRaw = (payload.perspective || "").toString().toLowerCase().trim();
+  const perspective = (perspectiveRaw === "buyer" || perspectiveRaw === "seller") ? perspectiveRaw : "";
+  console.log("Parsed loiText length:", loiText.length, "Perspective:", perspective || "(not specified)");
 
   if (!loiText) {
     console.error("Rejected: loiText was empty after parsing payload:", JSON.stringify(payload).slice(0, 200));
@@ -82,7 +97,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 2000,
-        system: SYSTEM_PROMPT,
+        system: buildSystemPrompt(perspective),
         messages: [
           {
             role: "user",

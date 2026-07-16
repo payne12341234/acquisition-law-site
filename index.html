@@ -834,6 +834,12 @@ function handleLoiReviewSubmit(e) {
 
   textPromise
   .then(function (loiText) {
+    // Some PDFs (scanned documents, "printed to PDF" images) have no selectable text layer at all —
+    // pdf.js can only pull embedded text, not read text out of an image. Catch that case clearly.
+    if (file && file.name.toLowerCase().endsWith('.pdf') && loiText.trim().length < 20) {
+      throw new Error('SCANNED_PDF');
+    }
+
     document.getElementById('loi-loading-text').textContent = 'Reviewing your LOI...';
 
     return fetch("/.netlify/functions/review-loi", {
@@ -843,7 +849,13 @@ function handleLoiReviewSubmit(e) {
     });
   })
   .then(res => {
-    if (!res.ok) throw new Error("Request failed");
+    if (!res.ok) {
+      return res.json().then(function (errData) {
+        throw new Error(errData && errData.error ? errData.error : "Request failed");
+      }).catch(function () {
+        throw new Error("Request failed");
+      });
+    }
     return res.json();
   })
   .then(data => {
@@ -857,10 +869,14 @@ function handleLoiReviewSubmit(e) {
     });
     results.style.display = 'block';
   })
-  .catch(() => {
+  .catch((err) => {
     loading.style.display = 'none';
     errorBox.style.display = 'block';
-    errorBox.textContent = "Something went wrong generating your review. Your LOI has been saved and our team will follow up directly.";
+    if (err && err.message === 'SCANNED_PDF') {
+      errorBox.textContent = "We couldn't find any readable text in this PDF — it looks like a scanned image rather than a text-based document. Please try \"Paste text instead,\" or upload a text-based Word (.docx) or .txt file.";
+    } else {
+      errorBox.textContent = "Something went wrong generating your review. Your LOI has been saved and our team will follow up directly.";
+    }
   });
 }
 </script>

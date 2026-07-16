@@ -947,6 +947,15 @@ function handleLoiReviewSubmit(e) {
       // mask whatever the real error message was).
       return res.json().catch(function () { return null; }).then(function (errData) {
         var msg = errData && errData.error ? errData.error : ("Request failed (status " + res.status + ")");
+        if (errData && errData.debugParseError) {
+          msg += " | Parse error: " + errData.debugParseError;
+        }
+        if (errData && errData.debugStopReason) {
+          msg += " | Stop reason: " + errData.debugStopReason;
+        }
+        if (errData && errData.debugRawLength !== undefined) {
+          msg += " | Raw length: " + errData.debugRawLength;
+        }
         if (errData && errData.debugRaw) {
           msg += " | Raw AI output: " + errData.debugRaw;
         }

@@ -842,18 +842,24 @@ function handleLoiReviewSubmit(e) {
 
     document.getElementById('loi-loading-text').textContent = 'Reviewing your LOI...';
 
+    // Trim client-side too, to keep the request payload small regardless of how long the source document is.
+    const MAX_CHARS = 15000;
+    const sendText = loiText.length > MAX_CHARS ? loiText.slice(0, MAX_CHARS) : loiText;
+    console.log("Sending loiText to function. Length:", sendText.length);
+
     return fetch("/.netlify/functions/review-loi", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name, email: email, loiText: loiText })
+      body: JSON.stringify({ name: name, email: email, loiText: sendText })
     });
   })
   .then(res => {
+    console.log("review-loi function response status:", res.status);
     if (!res.ok) {
       return res.json().then(function (errData) {
-        throw new Error(errData && errData.error ? errData.error : "Request failed");
+        throw new Error(errData && errData.error ? errData.error : ("Request failed (status " + res.status + ")"));
       }).catch(function () {
-        throw new Error("Request failed");
+        throw new Error("Request failed (status " + res.status + ")");
       });
     }
     return res.json();

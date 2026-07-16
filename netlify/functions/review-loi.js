@@ -81,7 +81,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 1200,
+        max_tokens: 2000,
         system: SYSTEM_PROMPT,
         messages: [
           {
@@ -111,13 +111,25 @@ exports.handler = async (event) => {
     try {
       // Strip accidental code fences just in case the model adds them.
       const cleaned = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
-      parsed = JSON.parse(cleaned);
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch (e1) {
+        // The model may have added a little preamble/commentary around the JSON
+        // despite instructions not to — try pulling out just the {...} object.
+        const firstBrace = cleaned.indexOf('{');
+        const lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          parsed = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+        } else {
+          throw e1;
+        }
+      }
     } catch (parseErr) {
-      console.error("Failed to parse model output as JSON:", rawText);
+      console.error("Failed to parse model output as JSON. Raw text was:", rawText);
       return {
         statusCode: 502,
         headers,
-        body: JSON.stringify({ error: "Could not generate a structured review. Please try again." })
+        body: JSON.stringify({ error: "Could not generate a structured review. Please try again.", debugRaw: rawText.slice(0, 500) })
       };
     }
 

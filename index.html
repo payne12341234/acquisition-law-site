@@ -733,7 +733,7 @@
 
 <!-- Hidden static form so Netlify detects this at deploy time — the actual submission happens via
      JS fetch once an AI review is generated, attaching the generated PDF to the lead's record. -->
-<form name="loi-review-pdf" data-netlify="true" netlify-honeypot="bot-field" style="display:none">
+<form name="loi-review-pdf" data-netlify="true" style="display:none">
   <input type="text" name="name">
   <input type="email" name="email">
   <input type="file" name="review_pdf">

@@ -5,6 +5,41 @@
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-5"; // swap to "claude-haiku-4-5-20251001" for a cheaper/faster option
 
+function sleep(ms) {
+  return new Promise(function (resolve) { setTimeout(resolve, ms); });
+}
+
+// Anthropic occasionally returns 429 (rate limited) or 529 (temporarily overloaded) — both are
+// transient and usually succeed on a quick retry, so don't surface them to the user as a failure
+// unless they persist across a few attempts.
+async function callAnthropicWithRetry(requestBody, maxAttempts) {
+  let lastResponse, lastErrText;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (response.ok || (response.status !== 429 && response.status !== 529)) {
+      return response;
+    }
+
+    lastResponse = response;
+    lastErrText = await response.text();
+    console.error("Anthropic API returned", response.status, "on attempt", attempt, "of", maxAttempts, "- retrying:", lastErrText);
+
+    if (attempt < maxAttempts) {
+      await sleep(attempt * 800); // small backoff: 800ms, then 1600ms
+    }
+  }
+  return lastResponse;
+}
+
 function buildSystemPrompt(perspective) {
   const isSeller = perspective === "seller";
   const isBuyer = perspective === "buyer";
@@ -105,35 +140,32 @@ exports.handler = async (event) => {
 
   try {
     console.log("Calling Anthropic API with model:", MODEL);
-    const response = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 4500,
-        system: buildSystemPrompt(perspective),
-        messages: [
-          {
-            role: "user",
-            content: userContent
-          }
-        ]
-      })
-    });
+    const response = await callAnthropicWithRetry({
+      model: MODEL,
+      max_tokens: 4500,
+      system: buildSystemPrompt(perspective),
+      messages: [
+        {
+          role: "user",
+          content: userContent
+        }
+      ]
+    }, 3);
 
     console.log("Anthropic API responded with status:", response.status);
 
     if (!response.ok) {
       const errText = await response.text();
       console.error("Anthropic API error:", response.status, errText);
+      const isOverloaded = response.status === 429 || response.status === 529;
       return {
         statusCode: 502,
         headers,
-        body: JSON.stringify({ error: "AI review service is temporarily unavailable." })
+        body: JSON.stringify({
+          error: isOverloaded
+            ? "Our AI review service is experiencing high demand right now. Please try again in a moment."
+            : "AI review service is temporarily unavailable."
+        })
       };
     }
 
